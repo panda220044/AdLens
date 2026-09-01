@@ -1,0 +1,44 @@
+{
+  "videos": [
+    {
+      "video_id": "yt_ujFWRFYLGjY",
+      "url": "https://www.youtube.com/watch?v=ujFWRFYLGjY",
+      "local_path": "",
+      "platform": "youtube",
+      "kind": "vod",
+      "notes": "Assignment test video 1 — long-form YouTube VOD"
+    },
+    {
+      "video_id": "yt_shorts_Ve0zdhTQA4U",
+      "url": "https://www.youtube.com/shorts/Ve0zdhTQA4U",
+      "local_path": "",
+      "platform": "youtube",
+      "kind": "short",
+      "notes": "Assignment test video 2 — YouTube Short"
+    },
+    {
+      "video_id": "yt_s0LLVQeMmtU",
+      "url": "https://www.youtube.com/watch?v=s0LLVQeMmtU",
+      "local_path": "",
+      "platform": "youtube",
+      "kind": "vod",
+      "notes": "Assignment test video 3 — long-form YouTube VOD"
+    },
+    {
+      "video_id": "ig_reel_DJl6-v8oufg",
+      "url": "https://www.instagram.com/reel/DJl6-v8oufg",
+      "local_path": "",
+      "platform": "instagram",
+      "kind": "short",
+      "notes": "Assignment test video 4 — Instagram Reel. Supply local_path to the manually downloaded file."
+    },
+    {
+      "video_id": "ig_reel_Db78RoIuOyl",
+      "url": "https://www.instagram.com/reel/Db78RoIuOyl/",
+      "local_path": "",
+      "platform": "instagram",
+      "kind": "short",
+      "notes": "Assignment test video 5 — Instagram Reel. Supply local_path to the manually downloaded file."
+    }
+  ]
+}

@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AdLens Viewer</title>
+  <meta name="description" content="AdLens — video advertisement segment viewer. Visualize detected ad segments on a video timeline." />
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #232635;
+      --accent: #6c63ff;
+      --accent2: #ff6b6b;
+      --text: #e2e8f0;
+      --text-dim: #8892a4;
+      --border: #2d3148;
+      --success: #4ade80;
+      --warning: #facc15;
+      --radius: 10px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    header h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    header .badge {
+      font-size: 0.7rem;
+      background: var(--accent);
+      color: #fff;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+    }
+
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 0;
+      height: calc(100vh - 57px);
+    }
+
+    /* Left panel: input + video + timeline */
+    .left-panel {
+      display: flex;
+      flex-direction: column;
+      padding: 20px 24px;
+      gap: 16px;
+      overflow-y: auto;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .input-row input {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      padding: 10px 14px;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .input-row input:focus { border-color: var(--accent); }
+
+    button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      padding: 10px 20px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    button:hover { opacity: 0.88; }
+    button:active { transform: scale(0.97); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    #file-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+    }
+
+    #file-input { display: none; }
+
+    /* Video */
+    .video-container {
+      background: #000;
+      border-radius: var(--radius);
+      overflow: hidden;
+      aspect-ratio: 16/9;
+      width: 100%;
+    }
+
+    #player {
+      width: 100%;
+      height: 100%;
+      display: none;
+    }
+
+    .video-placeholder {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-dim);
+      font-size: 0.9rem;
+      background: var(--surface2);
+      min-height: 240px;
+    }
+
+    /* Timeline */
+    .timeline-section { }
+
+    .timeline-section h3 {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+    }
+
+    .timeline {
+      height: 36px;
+      background: var(--surface2);
+      border-radius: 6px;
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+      border: 1px solid var(--border);
+    }
+
+    .timeline-bar {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+    }
+
+    .ad-marker {
+      position: absolute;
+      top: 4px;
+      bottom: 4px;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      min-width: 3px;
+    }
+
+    .ad-marker:hover { opacity: 0.7; filter: brightness(1.2); }
+
+    .playhead {
+      position: absolute;
+      top: 0; bottom: 0;
+      width: 2px;
+      background: #fff;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .timeline-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 4px;
+      font-size: 0.72rem;
+      color: var(--text-dim);
+    }
+
+    /* Status */
+    .status {
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      font-size: 0.85rem;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      display: none;
+    }
+
+    .status.visible { display: block; }
+    .status.loading { border-color: var(--accent); }
+    .status.error { border-color: var(--accent2); color: var(--accent2); }
+    .status.success { border-color: var(--success); }
+
+    .spinner {
+      display: inline-block;
+      width: 12px; height: 12px;
+      border: 2px solid var(--accent);
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Right panel: segments */
+    .right-panel {
+      border-left: 1px solid var(--border);
+      background: var(--surface);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .right-panel-header {
+      padding: 16px 20px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .right-panel-header h2 {
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+
+    .seg-count {
+      background: var(--accent);
+      color: #fff;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 12px;
+    }
+
+    .segments-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .segment-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .segment-card:hover {
+      border-color: var(--accent);
+      background: #1f2235;
+    }
+
+    .segment-card.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(108,99,255,0.2);
+    }
+
+    .seg-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .seg-id {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-dim);
+    }
+
+    .seg-type {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 10px;
+      text-transform: uppercase;
+    }
+
+    .seg-time {
+      margin-left: auto;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .seg-description {
+      font-size: 0.82rem;
+      color: var(--text-dim);
+      line-height: 1.4;
+      margin-bottom: 8px;
+    }
+
+    .seg-footer {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .conf-bar-wrap {
+      flex: 1;
+      height: 4px;
+      background: var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .conf-bar {
+      height: 100%;
+      border-radius: 4px;
+      background: var(--success);
+      transition: width 0.4s ease;
+    }
+
+    .conf-label {
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      min-width: 36px;
+      text-align: right;
+    }
+
+    .brand-tag {
+      font-size: 0.72rem;
+      background: rgba(108,99,255,0.15);
+      color: var(--accent);
+      padding: 1px 7px;
+      border-radius: 10px;
+      border: 1px solid rgba(108,99,255,0.3);
+    }
+
+    .no-segments {
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      text-align: center;
+      padding: 40px 20px;
+    }
+
+    /* Stats panel */
+    .stats-panel {
+      border-top: 1px solid var(--border);
+      padding: 12px 16px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 12px;
+    }
+
+    .stat-item { font-size: 0.75rem; }
+    .stat-label { color: var(--text-dim); }
+    .stat-value { color: var(--text); font-weight: 600; }
+
+    /* Type color map */
+    .type-preroll            { background: rgba(234,67,53,0.15); color: #f87171; border: 1px solid rgba(234,67,53,0.3); }
+    .type-midroll_sponsor_read { background: rgba(108,99,255,0.15); color: #a78bfa; border: 1px solid rgba(108,99,255,0.3); }
+    .type-product_placement  { background: rgba(251,146,60,0.15); color: #fb923c; border: 1px solid rgba(251,146,60,0.3); }
+    .type-self_promo         { background: rgba(45,212,191,0.15); color: #2dd4bf; border: 1px solid rgba(45,212,191,0.3); }
+    .type-affiliate          { background: rgba(250,204,21,0.15); color: #facc15; border: 1px solid rgba(250,204,21,0.3); }
+    .type-platform_inserted  { background: rgba(148,163,184,0.15); color: #94a3b8; border: 1px solid rgba(148,163,184,0.3); }
+    .type-bumper             { background: rgba(167,139,250,0.15); color: #c084fc; border: 1px solid rgba(167,139,250,0.3); }
+    .type-other              { background: rgba(100,116,139,0.15); color: #7c8da0; border: 1px solid rgba(100,116,139,0.3); }
+
+    .marker-preroll            { background: #f87171; }
+    .marker-midroll_sponsor_read { background: #a78bfa; }
+    .marker-product_placement  { background: #fb923c; }
+    .marker-self_promo         { background: #2dd4bf; }
+    .marker-affiliate          { background: #facc15; }
+    .marker-platform_inserted  { background: #94a3b8; }
+    .marker-bumper             { background: #c084fc; }
+    .marker-other              { background: #7c8da0; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>AdLens</h1>
+  <span class="badge">Ad Detector</span>
+</header>
+
+<main>
+  <div class="left-panel">
+
+    <!-- Input -->
+    <div class="input-row">
+      <input id="url-input" type="text" placeholder="YouTube URL or local file path…" />
+      <button id="analyze-btn" onclick="analyzeURL()">Analyze</button>
+      <button id="file-btn" onclick="document.getElementById('file-input').click()">📁 File</button>
+      <input type="file" id="file-input" accept=".mp4,.mov,.avi,.mkv,.webm,.m4v" onchange="analyzeFile(this)" />
+    </div>
+
+    <!-- Status -->
+    <div id="status" class="status"></div>
+
+    <!-- Video -->
+    <div class="video-container">
+      <div class="video-placeholder" id="video-placeholder">
+        Enter a YouTube URL or upload a local file to begin analysis.
+      </div>
+      <video id="player" controls></video>
+    </div>
+
+    <!-- Timeline -->
+    <div class="timeline-section">
+      <h3>Ad Timeline</h3>
+      <div class="timeline" id="timeline" onclick="seekFromTimeline(event)">
+        <div class="timeline-bar" id="timeline-bar"></div>
+        <div class="playhead" id="playhead" style="left:0"></div>
+      </div>
+      <div class="timeline-labels">
+        <span id="tl-start">0:00</span>
+        <span id="tl-end">—</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Right panel -->
+  <div class="right-panel">
+    <div class="right-panel-header">
+      <h2>Detected Segments</h2>
+      <span class="seg-count" id="seg-count">0</span>
+    </div>
+    <div class="segments-list" id="segments-list">
+      <div class="no-segments">No segments detected yet.<br/>Run an analysis to see results.</div>
+    </div>
+    <div class="stats-panel" id="stats-panel" style="display:none">
+      <div class="stat-item">
+        <div class="stat-label">Wall clock</div>
+        <div class="stat-value" id="stat-wall">—</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Est. cost</div>
+        <div class="stat-value" id="stat-cost">—</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Frames sampled</div>
+        <div class="stat-value" id="stat-frames">—</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Model calls</div>
+        <div class="stat-value" id="stat-calls">—</div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+  const API_BASE = window.location.origin;
+  let segments = [];
+  let duration = 0;
+  let player = document.getElementById('player');
+
+  // Playhead update
+  player.addEventListener('timeupdate', () => {
+    if (duration > 0) {
+      const pct = (player.currentTime / duration) * 100;
+      document.getElementById('playhead').style.left = pct + '%';
+      // Highlight active segment
+      segments.forEach((seg, i) => {
+        const card = document.getElementById('card-' + i);
+        if (card) {
+          const active = player.currentTime >= seg.start_s && player.currentTime <= seg.end_s;
+          card.classList.toggle('active', active);
+        }
+      });
+    }
+  });
+
+  function setStatus(msg, type='') {
+    const el = document.getElementById('status');
+    el.className = 'status visible ' + type;
+    el.innerHTML = type === 'loading'
+      ? `<span class="spinner"></span>${msg}`
+      : msg;
+  }
+
+  function hideStatus() {
+    document.getElementById('status').className = 'status';
+  }
+
+  async function analyzeURL() {
+    const url = document.getElementById('url-input').value.trim();
+    if (!url) return;
+    setStatus('Analyzing video… this may take a few minutes.', 'loading');
+    document.getElementById('analyze-btn').disabled = true;
+    try {
+      const resp = await fetch(API_BASE + '/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json();
+        throw new Error(err.detail || 'Analysis failed');
+      }
+      const data = await resp.json();
+      handleResult(data, url);
+      setStatus(`Analysis complete — ${data.segments.length} segment(s) detected.`, 'success');
+    } catch(e) {
+      setStatus('Error: ' + e.message, 'error');
+    } finally {
+      document.getElementById('analyze-btn').disabled = false;
+    }
+  }
+
+  async function analyzeFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+    setStatus(`Uploading and analyzing ${file.name}…`, 'loading');
+    const fd = new FormData();
+    fd.append('video', file);
+    try {
+      const resp = await fetch(API_BASE + '/analyze/file', {
+        method: 'POST',
+        body: fd,
+      });
+      if (!resp.ok) {
+        const err = await resp.json();
+        throw new Error(err.detail || 'Analysis failed');
+      }
+      const data = await resp.json();
+      // Load local file into player
+      const objUrl = URL.createObjectURL(file);
+      showPlayer(objUrl);
+      handleResult(data, file.name);
+      setStatus(`Analysis complete — ${data.segments.length} segment(s) detected.`, 'success');
+    } catch(e) {
+      setStatus('Error: ' + e.message, 'error');
+    }
+    input.value = '';
+  }
+
+  function handleResult(data, source) {
+    segments = data.segments || [];
+    duration = data.source.duration_s || 0;
+    renderTimeline();
+    renderSegments();
+    renderStats(data.stats);
+
+    // Attempt to load YouTube videos into the player via embed
+    if (source && (source.includes('youtube.com') || source.includes('youtu.be'))) {
+      const vidId = extractYouTubeId(source);
+      if (vidId) {
+        document.getElementById('video-placeholder').style.display = 'none';
+        document.getElementById('player').style.display = 'none';
+        // Use iframe for YouTube
+        let iframe = document.getElementById('yt-iframe');
+        if (!iframe) {
+          iframe = document.createElement('iframe');
+          iframe.id = 'yt-iframe';
+          iframe.style.cssText = 'width:100%;height:100%;border:none;';
+          iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+          iframe.allowFullscreen = true;
+          document.querySelector('.video-container').appendChild(iframe);
+        }
+        iframe.src = `https://www.youtube.com/embed/${vidId}?enablejsapi=1`;
+        iframe.style.display = 'block';
+      }
+    }
+
+    document.getElementById('tl-end').textContent = fmtTime(duration);
+  }
+
+  function showPlayer(src) {
+    document.getElementById('video-placeholder').style.display = 'none';
+    player.src = src;
+    player.style.display = 'block';
+    const yt = document.getElementById('yt-iframe');
+    if (yt) yt.style.display = 'none';
+  }
+
+  function renderTimeline() {
+    const bar = document.getElementById('timeline-bar');
+    bar.innerHTML = '';
+    if (!duration) return;
+    segments.forEach((seg, i) => {
+      const left = (seg.start_s / duration) * 100;
+      const width = ((seg.end_s - seg.start_s) / duration) * 100;
+      const div = document.createElement('div');
+      div.className = `ad-marker marker-${seg.ad_type}`;
+      div.style.left = left + '%';
+      div.style.width = Math.max(width, 0.5) + '%';
+      div.title = `${seg.ad_type} (${fmtTime(seg.start_s)}–${fmtTime(seg.end_s)})`;
+      div.onclick = (e) => { e.stopPropagation(); seekToSegment(i); };
+      bar.appendChild(div);
+    });
+  }
+
+  function renderSegments() {
+    const list = document.getElementById('segments-list');
+    document.getElementById('seg-count').textContent = segments.length;
+    if (segments.length === 0) {
+      list.innerHTML = '<div class="no-segments">No advertisement segments detected.</div>';
+      return;
+    }
+    list.innerHTML = segments.map((seg, i) => `
+      <div class="segment-card" id="card-${i}" onclick="seekToSegment(${i})">
+        <div class="seg-header">
+          <span class="seg-id">${seg.id}</span>
+          <span class="seg-type type-${seg.ad_type}">${seg.ad_type.replace(/_/g,' ')}</span>
+          ${seg.brand ? `<span class="brand-tag">${seg.brand}</span>` : ''}
+          <span class="seg-time">${fmtTime(seg.start_s)} – ${fmtTime(seg.end_s)}</span>
+        </div>
+        <div class="seg-description">${seg.description || 'No description available.'}</div>
+        <div class="seg-footer">
+          <div class="conf-bar-wrap">
+            <div class="conf-bar" style="width:${(seg.confidence*100).toFixed(1)}%"></div>
+          </div>
+          <span class="conf-label">${(seg.confidence*100).toFixed(0)}%</span>
+        </div>
+        ${seg.evidence.signals_used.length ? `
+          <div style="margin-top:6px;font-size:0.7rem;color:var(--text-dim)">
+            ${seg.evidence.signals_used.slice(0,5).join(' · ')}
+          </div>` : ''}
+      </div>
+    `).join('');
+  }
+
+  function renderStats(stats) {
+    if (!stats) return;
+    document.getElementById('stats-panel').style.display = 'grid';
+    document.getElementById('stat-wall').textContent = stats.wall_clock_s.toFixed(1) + 's';
+    document.getElementById('stat-cost').textContent = '$' + stats.estimated_cost_usd.toFixed(4);
+    document.getElementById('stat-frames').textContent = stats.frames_sampled;
+    document.getElementById('stat-calls').textContent = stats.model_calls;
+  }
+
+  function seekToSegment(i) {
+    const seg = segments[i];
+    if (!seg) return;
+    if (player.style.display !== 'none' && player.src) {
+      player.currentTime = seg.start_s;
+      player.play();
+    }
+    // Scroll card into view
+    const card = document.getElementById('card-' + i);
+    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function seekFromTimeline(e) {
+    if (!duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = (e.clientX - rect.left) / rect.width;
+    const t = pct * duration;
+    if (player.style.display !== 'none' && player.src) {
+      player.currentTime = t;
+    }
+  }
+
+  function fmtTime(s) {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = Math.floor(s % 60);
+    if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+    return `${m}:${String(sec).padStart(2,'0')}`;
+  }
+
+  function extractYouTubeId(url) {
+    const m = url.match(/(?:v=|\/shorts\/|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+    return m ? m[1] : null;
+  }
+
+  // Allow pressing Enter in URL input
+  document.getElementById('url-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') analyzeURL();
+  });
+</script>
+</body>
+</html>
