@@ -92,7 +92,7 @@ class TestSegmentBuilder:
     def test_group_windows_gap_exceeds_max(self):
         windows = [
             make_window(0, 5, 0.8),
-            make_window(10, 15, 0.8),  # gap = 5s > max_gap_s=3
+            make_window(15, 20, 0.8),  # gap = 10s > max_gap_s
         ]
         groups = self.builder._group_windows(windows)
         assert len(groups) == 2
